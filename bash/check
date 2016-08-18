@@ -1,0 +1,59 @@
+#!/bin/bash
+# Color Codes
+GR='\e[32m' #Green
+RD='\e[31m' #Red
+BL='\e[34m' #Blue
+CY='\e[36m' #Cyan
+YL='\e[93m' #Yellow 
+
+#Highlights w/ Bold Text
+BH='\e[104;1m'   #Light Blue
+RH='\e[41;1m'    #Red     
+NC='\e[0m'       #No Color - use to clear
+
+DOMAIN=$(echo "$1")     #User entered domain
+RESOLV=$(echo "$2")     #Alternate Resolver
+
+DNS(){
+NS=$(dig ${DOMAIN} ns +short)
+NSIP=$(dig ${NS} +short)
+A=$(dig ${DOMAIN} +short)
+MX=$(dig ${DOMAIN} mx +short)
+MXIP=$(dig ${MX} +short)
+TXT=$(dig ${DOMAIN} txt +short)
+
+}
+
+
+http-status(){
+STATUS=$(curl -I ${DOMAIN} --silent | grep HTTP | tr -d '\r' | cut -d ' ' -f2-5)
+SERVER=$(curl -I ${DOMAIN} --silent | egrep 'Server')
+CODE=$(echo $STATUS | awk '{print $1}')
+
+echo -e "${BH}----------HTTP STATUS----------${NC}"
+echo
+if [[ $CODE == 3* ]]
+then
+    NEW=$(curl -I ${DOMAIN} --silent | grep Location | awk '{print $2}' | tr -d '\r')
+    NEWSTAT=$(curl -I $NEW --silent | grep HTTP | cut -d ' ' -f2-5)
+    NEWCODE=$(echo $NEWSTAT | awk '{print $1}')
+    echo -e "${YL}${STATUS} ---> ${NEW}${NC}"
+    if [[ $NEWCODE == 2* ]]
+    then    
+        echo -e "${NEW} Status  > ${GR}${NEWSTAT}${NC}"
+        echo $SERVER
+    else
+        echo -e "${NEW} Status > ${RD}${NEWSTAT}${NC}"
+        echo $SERVER
+    fi
+elif [[ $CODE == 2* ]]
+then
+    echo -e "${GR}$STATUS${NC}"
+    echo $SERVER
+else
+    echo -e "${RD}$STATUS${NC}"
+    echo $SERVER
+fi
+exit 1
+}
+http-status
