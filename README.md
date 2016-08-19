@@ -17,4 +17,5 @@ ls -al /bin/sh
 To change the symlink for sh back to bash:
 
 sudo rm /bin/sh
+
 sudo ln -s /bin/bash /bin/sh
