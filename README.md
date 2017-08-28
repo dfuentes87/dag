@@ -19,3 +19,5 @@ To change the symlink for sh back to bash:
 sudo rm /bin/sh
 
 sudo ln -s /bin/bash /bin/sh
+
+Originaly forked from: https://github.com/namho-kim
