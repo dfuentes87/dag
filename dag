@@ -28,8 +28,8 @@ dns_info() {
   echo -e "${BH}-------------------------DNS Information for ${domain}-------------------------${NC}"
   echo
   if [[ -z ${resolv} ]]; then
-  resolv=64.207.128.222
-  echo -e "${RD}USING RESOLVER 8.8.8.8 (Google)${NC}"
+  resolv=8.8.8.8
+  echo -e "${RD}USING RESOLVER ${resolv} (Google)${NC}"
   echo
 else
   echo -e "${RD}USING RESOLVER $(echo ${resolv} | sed 's/@//g')${NC}"
