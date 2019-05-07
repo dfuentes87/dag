@@ -29,7 +29,7 @@ dns_info() {
   echo
   if [[ -z ${resolv} ]]; then
   resolv=64.207.128.222
-  echo -e "${RD}USING RESOLVER resolv3.mediatemple.net (64.207.128.222)${NC}"
+  echo -e "${RD}USING RESOLVER 8.8.8.8 (Google)${NC}"
   echo
 else
   echo -e "${RD}USING RESOLVER $(echo ${resolv} | sed 's/@//g')${NC}"
