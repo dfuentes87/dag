@@ -7,20 +7,18 @@
 # Color Codes
 GR='\033[32m'           #Green
 RD='\033[31m'           #Red
-BL='\033[34m'           #Blue
 CY='\033[36m'           #Cyan
 YL='\033[33m'           #Yellow
 # Highlights w/ Bold Text
 BH='\033[44;1m'         #Blue
 PH='\033[48;5;54;1m'    #Purple 
 GH='\033[48;5;22;1m'    #Green 
-RH='\033[41;1m'         #Red
 #No Color - use to clear
 NC='\033[0m'
 
 # Add domain and resolver
-domain=$(echo "${1}") 
-resolv=$(echo "${2}")
+domain="$1" 
+resolv="$2"
 
 # DNS Information
 # Get the record and check WhoIs of IP to check where domain is hosting.
@@ -36,13 +34,13 @@ else
   echo
 fi
 
-  CNAME=$(dig ${domain} +short | grep -E "[a-z]|[A-Z]")
+  CNAME=$(dig "${domain}" +short | grep -E "[a-z]|[A-Z]")
   # get nameservers, even from subdomains, and avoids CNAME showing up again
-  NS=$(dig ${domain} ns ${resolv} | awk '/NS/ {print substr($0, index($0,$5))}' | grep -v ';')
-  A=$(dig ${domain} +short ${resolv})
-  MX=$(dig ${domain} mx +short ${resolv} | awk '{print $2}')
+  NS=$(dig "${domain}" ns "${resolv}" | awk '/NS/ {print substr($0, index($0,$5))}' | grep -v ';')
+  A=$(dig "${domain}" +short "${resolv}")
+  MX=$(dig "${domain}" mx +short "${resolv}" | awk '{print $2}')
   # get txt and prevent CNAME from showing up again
-  TXT=$(dig ${domain} txt ${resolv} | grep -v 'CNAME\|^;' | grep ${domain} | awk '/TXT/ {print substr($0, index($0,$5))}')
+  TXT=$(dig "${domain}" txt "${resolv}" | grep -v 'CNAME\|^;' | grep "${domain}" | awk '/TXT/ {print substr($0, index($0,$5))}')
 
   # Nameservers 
   ns() {
@@ -68,7 +66,7 @@ fi
       else
       for line in ${A}
       do
-        aorg=$(whois ${line} | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
+        aorg=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
         printf "%-30s | %-15s | %-30s" "${domain}" "${line}" "${aorg}" | awk '$1=$1'
         echo
       done
@@ -80,10 +78,10 @@ fi
       #echo -e "${YL}"
       printf "%-30s | %-15s | %-30s" "${domain}" "CNAME" "${CNAME}"
       echo -e "${NC}"
-      CIP=$(dig ${CNAME} +short)
+      CIP=$(dig "${CNAME}" +short)
       for line in ${CIP}
       do
-        cwho=$(whois ${line} | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
+        cwho=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
         printf "%-30s | %-15s | %-30s" "${CNAME}" "${CIP}" "${cwho}"
         echo
       done
@@ -100,9 +98,9 @@ fi
   else 
     for line in ${MX}
     do
-      mxip=$(dig ${line} +short ${resolv})
+      mxip=$(dig "${line}" +short "${resolv}")
       echo -e "${RD}${line}${NC}"
-      echo "${mxip}" | while read x; do printf "%-15s | %-30s" "$x" "`whois $x | grep -Ew "OrgName:|org-name:" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//'`" | awk '$1=$1' && echo; done
+      echo "${mxip}" | while read -r x; do printf "%-15s | %-30s" "$x" "$(whois "$x" | grep -Ew "OrgName:|org-name:" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')" | awk '$1=$1' && echo; done
     done
   fi
 
@@ -128,7 +126,7 @@ who_info() {
   echo -e "${GH}------------------------WhoIs Information for ${domain}------------------------${NC}"
   echo
 
-  whois ${domain} > ~/.whowho.txt
+  whois "${domain}" > ~/.whowho.txt
   #Check if domain is registered
   CHK=$(grep -w 'Name Server' ~/.whowho.txt)
   
@@ -166,15 +164,15 @@ who_info() {
 http_info() {
   echo -e "${PH}---------------------------HTTP Status for ${domain}---------------------------${NC}"
   echo
-  STATUS=$(curl -sSI ${domain} 2>&1 | grep HTTP)
-  CODE=$(echo $STATUS | awk '{print $2}')
+  STATUS=$(curl -sSI "${domain}" 2>&1 | grep HTTP)
+  CODE=$(echo "${STATUS}" | awk '{print $2}')
 
   if [[ -z $STATUS ]]; then
     echo -e "${RD}Could not resolve host: ${domain}${NC}"
   elif [[ $CODE == 30* ]] || [[ $CODE == 200 ]]; then
     # first awk adds a newline between results, tr fixes line ends (don't know why I had to)
     # second awk brings together each result
-    curl -sSIL ${domain} | grep -i 'http/\|location' | grep -vi 'set-cookie:' | awk ' {print;} NR % 2 == 0 { print ""; }' | tr -d '\15\32' | sed '/HTTP.* 30[12]/s/$/ ----->/' | awk '!/^[Ll]ocation:/&&NR>1{print OFS}{printf "%s ",$0}END{print OFS}' | sed 's/[Ll]ocation: //g' |
+    curl -sSIL "${domain}" | grep -i 'http/\|location' | grep -vi 'set-cookie:' | awk ' {print;} NR % 2 == 0 { print ""; }' | tr -d '\15\32' | sed '/HTTP.* 30[12]/s/$/ ----->/' | awk '!/^[Ll]ocation:/&&NR>1{print OFS}{printf "%s ",$0}END{print OFS}' | sed 's/[Ll]ocation: //g' |
     # Add some color to each result: 301|302 Yellow and 200 Green
     awk '/HTTP.* 30[12]/{s=3}/HTTP.* 200/{s=2}$0="\033[3"s"m"$0"\33[0m"'
   else
