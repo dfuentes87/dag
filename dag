@@ -176,7 +176,7 @@ who_info() {
   if [[ -z ${reg_chk} ]]; then
     echo -e "${RD}Could not obtain WhoIs information for ${domain}\n\nThis part of the script is generally not fully compatible with \nforeign and rare TLDs due to the unstandardized WhoIs formats.\nIf the domain you entered is valid, do a manual 'whois' lookup.\n\nNOTE: Subdomains will not return WhoIs information.${NC}"
   else
-    registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | awk '{$1=$1};1' | uniq)
+    registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | awk '{$1=$1};1' | uniq | head -1)
     reseller=$(echo "${dom_whois}" | awk '/Reseller:/ {print substr($0, index($0,$2))}' | sed '/^$/d' | grep -v 'Reseller:' | uniq)
     reg_name=$(echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Registrant Name:/ {print BD$1" "$2NC" " substr($0, index($0,$3))}')
 
