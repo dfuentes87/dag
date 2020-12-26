@@ -1,6 +1,6 @@
 # dag
 
-Domain At Glance, aka dag
+Domain At a Glance, aka dag
 
 Quick and concise dig, whois, and curl to get a quick overview of a domain's information for the purpose of troubleshooting hosting issues with domains.
 
@@ -8,7 +8,7 @@ NOTE: If you are using an Ubuntu-based distro such as Linux Mint, be aware that 
 
 https://wiki.ubuntu.com/DashAsBinSh
 
-So either you have to use the full bash command 'bash dag somedomain.com' or you can change the sh symlink back to bash:
+So either you have to use the full bash command 'bash dag somedomain.com' or you can change the shell symlink back to bash:
 
 To see if your running dash run:
 
