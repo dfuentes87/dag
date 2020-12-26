@@ -20,4 +20,4 @@ sudo rm /bin/sh
 
 sudo ln -s /bin/bash /bin/sh
 
-Originaly forked from: https://github.com/namho-kim
+Originaly forked from: https://github.com/namh0
