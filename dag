@@ -204,7 +204,7 @@ who_info() {
   if [[ -z ${reg_chk} ]]; then
     echo -e "${RD}Could not obtain WhoIs information for ${domain}\n\nThis part of the script is generally not fully compatible with \nforeign and rare TLDs due to the unstandardized WhoIs formats.\nIf the domain you entered is valid, do a manual 'whois' lookup.\n\nNOTE: Subdomains will not return WhoIs information.${NC}"
   else
-    registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | uniq | awk '{$1=$1};1')
+    registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | awk '{$1=$1};1' | uniq)
     echo -e "${BD}Registrar:${NC} ${registrar}"
     # blame the ugliness of the next line on unstandardized whois outputs
     reg_resell=$(echo "${dom_whois}" | awk '/Reseller:/ {print substr($0, index($0,$2))}' | sed '/^$/d' | grep -v 'Reseller:' | uniq)
