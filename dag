@@ -37,18 +37,17 @@ dns_info() {
     echo
   fi
 
-  CNAME=$(dig "${domain}" +short | grep -E "[a-z]|[A-Z]")
-  # grep -v should avoid CNAMEs from showing up again
   NS=$(dig "${domain}" ns "${resolv}" | awk '/NS/ {print substr($0, index($0,$5))}' | grep -v ';')
-  A=$(dig "${domain}" +short "${resolv}")
-  AAAA=$(dig "${domain}" aaaa +short "${resolv}")
-  MX=$(dig "${domain}" mx +short "${resolv}" | sed 's/.$//g' | sort -h)
+  A=$(dig "${domain}" a +short "${resolv}" | grep -vE "[a-z]|[A-Z]")
+  CNAME=$(dig "${domain}" cname +short "${resolv}" | sed 's/.$//g')
+  AAAA=$(dig "${domain}" aaaa +short "${resolv}" | sed '/.*\.$/d')
+  # this will prevent 'dig mx' from pulling up CNAMEs
+  MX=$(dig "${domain}" mx "${resolv}" | awk '/MX/ {print $5" "$6}' | sed 's/\.$//g;/^[[:space:]]*$/d' | sort -h)
   TXT=$(dig "${domain}" txt "${resolv}" | grep -v 'CNAME\|^;' | grep "${domain}" | awk '/TXT/ {print substr($0, index($0,$5))}')
 
   # Name Servers 
   ns() {
-    echo -e "${GR}Name Server Records${NC}"
-    # Check for NS, give error/warning if not found
+    echo -e "${GR}Name Servers${NC}"
     if [[ -z ${NS} ]]; then
       echo -e "${RD}${domain} is not resolving to any Name Servers.\nIf you entered a subdomain, try dig on the parent domain for the NS records.${NC}"
       echo
@@ -68,7 +67,7 @@ dns_info() {
       else
         for line in ${A}; do
           aorg=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
-          printf "%-30s -> %-15s ( %-30s)" "${domain}" "${line}" "${aorg}" | awk '$1=$1'
+          printf "%-15s ( %-30s)" "${line}" "${aorg}" | awk '$1=$1'
         done
         echo
       fi
@@ -76,12 +75,11 @@ dns_info() {
       echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
       echo
       echo -e "${GR}CNAME Record for ${domain}${NC}${YL}"
-      printf "%-30s | %-15s | %-30s" "${domain}" "CNAME" "${CNAME}"
-      echo -e "${NC}"
-      CIP=$(dig "${CNAME}" +short)
-      for line in ${CIP}; do
-        cwho=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
-        printf "%-30s | %-15s | %-30s" "${CNAME}" "${CIP}" "${cwho}"
+      printf "%-10s -> %-15s" "${domain}" "${CNAME}"
+      echo -e "${NC}\n"
+      dig "${CNAME}" +short | while read -r cname_ip; do
+        cip_org=$(whois "${cname_ip}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
+        printf "%-15s -> %-10s ( %-15s)" "${CNAME}" "${cname_ip}" "${cip_org}"
         echo
       done
       echo
@@ -91,28 +89,16 @@ dns_info() {
   # PTR Records
   ptr() {
     echo -e "${GR}PTR Records${NC}"
-    if [[ -z ${CNAME} ]]; then
-      if [[ -z ${A} ]]; then
-        echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
-        echo
-      else
-        for line in ${A}; do
-          a_ptr=$(dig -x ${line} +short)
-          printf "%-15s -> %-30s" "${line}" "${a_ptr}" | awk '$1=$1' | sed 's/.$//g'
-        done
-        echo
-      fi
-    else
+    if [[ -z ${A} ]]; then
       echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
       echo
-      echo -e "${GR}CNAME Record for ${domain}${NC}${YL}"
-      printf "%-30s | %-15s | %-30s" "${domain}" "CNAME" "${CNAME}"
-      echo -e "${NC}"
-      CIP=$(dig "${CNAME}" +short)
-      for line in ${CIP}; do
-        cwho=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
-        printf "%-30s | %-15s | %-30s" "${CNAME}" "${CIP}" "${cwho}"
-        echo
+    else
+      for line in ${A}; do
+        a_ptr=$(dig -x ${line} +short)
+        if [[ -z "${a_ptr}" ]]; then
+          a_ptr="No PTR record"
+        fi
+        printf "%-15s -> %-30s" "${line}" "${a_ptr}" | awk '$1=$1' | sed 's/\.$//g'
       done
       echo
     fi
@@ -121,28 +107,13 @@ dns_info() {
   # AAAA Records
   aaaa() {
     echo -e "${GR}AAAA Records${NC}"
-    if [[ -z ${CNAME} ]]; then
-      if [[ -z ${AAAA} ]]; then
-        echo -e "${RD}${domain} isn't pointing to an AAAA record.${NC}"
-        echo
-      else
-        for line in ${AAAA}; do
-          aaaaorg=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
-          printf "%-30s | %-15s | %-30s" "${domain}" "${line}" "${aaaaorg}" | awk '$1=$1'
-        done
-        echo
-      fi
-    else
+    if [[ -z ${AAAA} ]]; then
       echo -e "${RD}${domain} isn't pointing to an AAAA record.${NC}"
       echo
-      echo -e "${GR}CNAME Record for ${domain}${NC}${YL}"
-      printf "%-30s | %-15s | %-30s" "${domain}" "CNAME" "${CNAME}"
-      echo -e "${NC}"
-      CIP=$(dig "${CNAME}" +short)
-      for line in ${CIP}; do
-        cwho=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
-        printf "%-30s | %-15s | %-30s" "${CNAME}" "${CIP}" "${cwho}"
-        echo
+    else
+      for line in ${AAAA}; do
+        aaaaorg=$(whois "${line}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
+        printf "%-15s ( %-30s)" "${line}" "${aaaaorg}" | awk '$1=$1'
       done
       echo
     fi
@@ -161,7 +132,7 @@ dns_info() {
         mxip=$(dig "${mx_host}" +short "${resolv}")
         echo "${mxip}" | while read -r ip; do
           mxip_org=$(whois "${ip}" | grep -Ew "OrgName:|org-name:" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
-          printf "%-30s | Priority: %-15s | %-15s ( %-30s)" "${mx_host}" "${priority}" "${ip}" "${mxip_org}" | awk '$1=$1'
+          printf "Priority: %-30s | %-15s -> %-15s ( %-30s)" "${priority}" "${mx_host}" "${ip}" "${mxip_org}" | awk '$1=$1'
         done
       done
       echo
@@ -175,7 +146,7 @@ dns_info() {
       echo -e "${RD}No TXT records found for ${domain}${NC}"
       echo
     else
-      printf "%s" "${TXT}"
+      echo "${TXT}"
       echo
       echo
     fi
@@ -199,25 +170,30 @@ who_info() {
 
   dom_whois=$(whois "${domain}")
 
-  # check if domain is registered (specificity will direct unstandard whois to message below)
+  # check to avoid poor outputs
   reg_chk=$(echo "${dom_whois}" | grep -i 'Domain Name:' | head -1 | awk -F':' '{print $2}')
+  
   if [[ -z ${reg_chk} ]]; then
     echo -e "${RD}Could not obtain WhoIs information for ${domain}\n\nThis part of the script is generally not fully compatible with \nforeign and rare TLDs due to the unstandardized WhoIs formats.\nIf the domain you entered is valid, do a manual 'whois' lookup.\n\nNOTE: Subdomains will not return WhoIs information.${NC}"
   else
     registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | awk '{$1=$1};1' | uniq)
+    reseller=$(echo "${dom_whois}" | awk '/Reseller:/ {print substr($0, index($0,$2))}' | sed '/^$/d' | grep -v 'Reseller:' | uniq)
+    reg_name=$(echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Registrant Name:/ {print BD$1" "$2NC" " substr($0, index($0,$3))}')
+
+    # registrar
     echo -e "${BD}Registrar:${NC} ${registrar}"
-    # blame the ugliness of the next line on unstandardized whois outputs
-    reg_resell=$(echo "${dom_whois}" | awk '/Reseller:/ {print substr($0, index($0,$2))}' | sed '/^$/d' | grep -v 'Reseller:' | uniq)
-    if [[ -z "${reg_resell}" ]]; then
+    # reseller
+    if [[ -z "${reseller}" ]]; then
       echo -e "${BD}Reseller:${NC} n/a"
     else
-      echo -e "${BD}Reseller:${NC} ${reg_resell}"
+      echo -e "${BD}Reseller:${NC} ${reseller}"
     fi
     echo
+    # dates
     echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Creation Date/ || /Updated Date/ {print BD$1" "$2NC" " substr($0, index($0,$3))}' | head -2
     echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Registry Expiry Date/ {print BD$1" "$2" "$3NC" " substr($0, index($0,$4))}'
     echo
-    reg_name=$(echo "${dom_whois}" | awk '/Registrant Name:/')
+    # registrant name, org, email, and admin email
     if [[ -z "${reg_name}" ]]; then
       echo -e "${BD}Registrant Name:${NC} None Found!"
     else
@@ -225,10 +201,13 @@ who_info() {
     fi
     echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Registrant Organization/ || /Registrant Email/ || /Admin Name/ || /Admin Email/ {print BD$1" "$2NC" " substr($0, index($0,$3))}'
     echo
+    # domain status, last update, warning
     echo -e "${CY}Domain Status${NC}"
     echo "${dom_whois}" | awk '/Domain Status/ {print $3}' | sort | uniq
     echo
     echo "${dom_whois}" | awk '/Last update/' | head -1
+    echo
+    echo -e "${RD}This part of the script is not fully compatible with foreign and \nuncommon TLDs due to unstandardized WhoIs formats. If WhoIs data \nabove is missing or poorly formatted, do a manual 'whois' lookup.${NC}"
   fi
   echo
 }
