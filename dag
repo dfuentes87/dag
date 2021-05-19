@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Domain At a Glance, aka dag
-# Originally written by Nam-ho Kim (https://github.com/namh0)
+# Originally written by Randy Marcial and Nam-ho Kim (https://github.com/namh0)
 # Forked and updated by David Fuentes (https://github.com/dfuentes87)
 # Uses dig, whois, and curl to show a quick and pretty overview of a domain's information
 # for the purpose of troubleshooting hosting issues
@@ -21,35 +21,35 @@ BD='\033[1m'
 NC='\033[0m'
 
 # Add domain and resolver
-domain="$1" 
-resolv="$2"
+DOMAIN=$(echo -e "$1" | cut -d/ -f3 | sed 's/^.*www.//')
+RESOLV="$2"
 
 # DNS Information
 dns_info() {
   echo -e "${BH}------------------------- DNS Information -------------------------${NC}"
   echo
-  if [[ -z ${resolv} ]]; then
-    resolv=8.8.8.8
-    echo -e "${RD}USING RESOLVER ${resolv} (Google)${NC}"
+  if [[ -z ${RESOLV} ]]; then
+    RESOLV=8.8.8.8
+    echo -e "${RD}USING RESOLVER ${RESOLV} (Google)${NC}"
     echo
   else
-    echo -e "${RD}USING RESOLVER ${resolv//@/}${NC}"
+    echo -e "${RD}USING RESOLVER ${RESOLV//@/}${NC}"
     echo
   fi
 
-  NS=$(dig "${domain}" ns "${resolv}" | awk '/NS/ {print substr($0, index($0,$5))}' | grep -v ';')
-  A=$(dig "${domain}" a +short "${resolv}" | grep -vE "[a-z]|[A-Z]")
-  CNAME=$(dig "${domain}" cname +short "${resolv}" | sed 's/.$//g')
-  AAAA=$(dig "${domain}" aaaa +short "${resolv}" | sed '/.*\.$/d')
+  NS=$(dig "${DOMAIN}" ns "${RESOLV}" | awk '/NS/ {print substr($0, index($0,$5))}' | grep -v ';')
+  A=$(dig "${DOMAIN}" a +short "${RESOLV}" | grep -vE "[a-z]|[A-Z]")
+  CNAME=$(dig "${DOMAIN}" cname +short "${RESOLV}" | sed 's/.$//g')
+  AAAA=$(dig "${DOMAIN}" aaaa +short "${RESOLV}" | sed '/.*\.$/d')
   # this will prevent 'dig mx' from pulling up CNAMEs
-  MX=$(dig "${domain}" mx "${resolv}" | awk '/MX/ {print $5" "$6}' | sed 's/\.$//g;/^[[:space:]]*$/d' | sort -h)
-  TXT=$(dig "${domain}" txt "${resolv}" | grep -v 'CNAME\|^;' | grep "${domain}" | awk '/TXT/ {print substr($0, index($0,$5))}')
+  MX=$(dig "${DOMAIN}" mx "${RESOLV}" | awk '/MX/ {print $5" "$6}' | sed 's/\.$//g;/^[[:space:]]*$/d' | sort -h)
+  TXT=$(dig "${DOMAIN}" txt "${RESOLV}" | grep -v 'CNAME\|^;' | grep "${DOMAIN}" | awk '/TXT/ {print substr($0, index($0,$5))}')
 
   # Name Servers 
   ns() {
     echo -e "${GR}Name Servers${NC}"
     if [[ -z ${NS} ]]; then
-      echo -e "${RD}${domain} is not resolving to any Name Servers.\nIf you entered a subdomain, try dig on the parent domain for the NS records.${NC}"
+      echo -e "${RD}${DOMAIN} is not resolving to any Name Servers.${NC}\nNOTE: If you entered a subdomain, do dig on the parent domain for the NS records."
       echo
     else
       printf "%s\n" "${NS}" | sed 's/.$//g'
@@ -62,7 +62,7 @@ dns_info() {
     echo -e "${GR}A Records${NC}"
     if [[ -z ${CNAME} ]]; then
       if [[ -z ${A} ]]; then
-        echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
+        echo -e "${RD}${DOMAIN} isn't pointing to an A record.${NC}"
         echo
       else
         for line in ${A}; do
@@ -72,10 +72,10 @@ dns_info() {
         echo
       fi
     else
-      echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
+      echo -e "${RD}${DOMAIN} isn't pointing to an A record.${NC}"
       echo
-      echo -e "${GR}CNAME Record for ${domain}${NC}${YL}"
-      printf "%-10s -> %-15s" "${domain}" "${CNAME}"
+      echo -e "${GR}CNAME Record for ${DOMAIN}${NC}${YL}"
+      printf "%-10s -> %-15s" "${DOMAIN}" "${CNAME}"
       echo -e "${NC}\n"
       dig "${CNAME}" +short | while read -r cname_ip; do
         cip_org=$(whois "${cname_ip}" | grep -Ew "OrgName:|org-name" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//') 
@@ -90,11 +90,11 @@ dns_info() {
   ptr() {
     echo -e "${GR}PTR Records${NC}"
     if [[ -z ${A} ]]; then
-      echo -e "${RD}${domain} isn't pointing to an A record.${NC}"
+      echo -e "${RD}${DOMAIN} isn't pointing to an A record.${NC}"
       echo
     else
       for line in ${A}; do
-        a_ptr=$(dig -x ${line} +short)
+        a_ptr=$(dig -x "${line}" +short)
         if [[ -z "${a_ptr}" ]]; then
           a_ptr="No PTR record"
         fi
@@ -108,7 +108,7 @@ dns_info() {
   aaaa() {
     echo -e "${GR}AAAA Records${NC}"
     if [[ -z ${AAAA} ]]; then
-      echo -e "${RD}${domain} isn't pointing to an AAAA record.${NC}"
+      echo -e "${RD}${DOMAIN} isn't pointing to an AAAA record.${NC}"
       echo
     else
       for line in ${AAAA}; do
@@ -123,13 +123,13 @@ dns_info() {
   mx() {
     echo -e "${GR}MX Records${NC}"
     if [[ -z "${MX}" ]] || [[ ! "${MX}" =~ [a-zA-Z] ]]; then
-      echo -e "${RD}No MX records found for ${domain}${NC}"
+      echo -e "${RD}No MX records found for ${DOMAIN}${NC}"
       echo
     else
       echo "${MX}" | while read -r line; do
         priority=$(echo "${line}" | awk '{print $1}')
         mx_host=$(echo "${line}" | awk '{print $2}')
-        mxip=$(dig "${mx_host}" +short "${resolv}")
+        mxip=$(dig "${mx_host}" +short "${RESOLV}")
         echo "${mxip}" | while read -r ip; do
           mxip_org=$(whois "${ip}" | grep -Ew "OrgName:|org-name:" | perl -ne 'print if $. <= 1' | cut -d ':' -f2 | sed -e 's/^[ \t]*//')
           printf "Priority: %-30s | %-15s -> %-15s ( %-30s)" "${priority}" "${mx_host}" "${ip}" "${mxip_org}" | awk '$1=$1'
@@ -143,11 +143,10 @@ dns_info() {
   txt() {
     echo -e "${GR}TXT Records${NC}"
     if [[ -z ${TXT} ]]; then
-      echo -e "${RD}No TXT records found for ${domain}${NC}"
+      echo -e "${RD}No TXT records found for ${DOMAIN}${NC}"
       echo
     else
       echo "${TXT}"
-      echo
       echo
     fi
     }
@@ -162,19 +161,21 @@ dns_info() {
 }
 
 # WhoIs Information
-# Get important details of domain most relevant for troubleshooting issues.
-# WhoIs is not uniform, so output may not be ideal.
+# WhoIs is not uniform, so output may not be ideal
 who_info() {
   echo -e "${GH}------------------------ WhoIs Information ------------------------${NC}"
   echo
 
-  dom_whois=$(whois "${domain}")
+  echo -e "${RD}This part of the script is not fully compatible with foreign and \nuncommon TLDs due to unstandardized WhoIs formats. If WhoIs data \nbelow is missing or poorly formatted, do a manual 'whois' lookup.${NC}"
+  echo
+
+  dom_whois=$(whois "${DOMAIN}")
 
   # check to avoid poor outputs
   reg_chk=$(echo "${dom_whois}" | grep -i 'Domain Name:' | head -1 | awk -F':' '{print $2}')
   
   if [[ -z ${reg_chk} ]]; then
-    echo -e "${RD}Could not obtain WhoIs information for ${domain}\n\nThis part of the script is generally not fully compatible with \nforeign and rare TLDs due to the unstandardized WhoIs formats.\nIf the domain you entered is valid, do a manual 'whois' lookup.\n\nNOTE: Subdomains will not return WhoIs information.${NC}"
+    echo -e "${RD}Could not obtain WhoIs information for ${DOMAIN}\n\nThis part of the script is generally not fully compatible with \nforeign and rare TLDs due to the unstandardized WhoIs formats.\nIf the domain you entered is valid, do a manual 'whois' lookup.\n\nNOTE: Subdomains will not return WhoIs information.${NC}"
   else
     registrar=$(echo "${dom_whois}" | awk -F':' '/Registrar:/ {print substr($0, index($0,$2))}' | awk '{$1=$1};1' | uniq | head -1)
     reseller=$(echo "${dom_whois}" | awk '/Reseller:/ {print substr($0, index($0,$2))}' | sed '/^$/d' | grep -v 'Reseller:' | uniq)
@@ -201,59 +202,60 @@ who_info() {
     fi
     echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Registrant Organization/ || /Registrant Email/ || /Admin Name/ || /Admin Email/ {print BD$1" "$2NC" " substr($0, index($0,$3))}'
     echo
-    # domain status, last update, warning
+    # domain status, last update
     echo -e "${CY}Domain Status${NC}"
-    echo "${dom_whois}" | awk '/Domain Status/ {print $3}' | sort | uniq
+    # 2nd whois details is less accurate when it comes to the status, so remove it
+    echo "${dom_whois}" | sed -n '/TERMS OF USE.*/q;p' | awk '/Domain Status/ {print $3}' | sort | uniq
     echo
-    echo "${dom_whois}" | awk '/Last update/' | head -1
-    echo
-    echo -e "${RD}This part of the script is not fully compatible with foreign and \nuncommon TLDs due to unstandardized WhoIs formats. If WhoIs data \nabove is missing or poorly formatted, do a manual 'whois' lookup.${NC}"
+    echo "${dom_whois}" | awk -v BD=$BD -v NC=$NC '/Last update/ {print BD$0NC}' | head -1
   fi
   echo
 }
 
-# HTTP INF
+# HTTP Information
 http_info() {
   echo -e "${PH}--------------------------- HTTP Status ---------------------------${NC}"
   echo
-  STATUS=$(curl -sSI "${domain}" 2>&1 | grep HTTP)
+  STATUS=$(curl -sSI "${DOMAIN}" 2>&1 | grep HTTP)
   CODE=$(echo "${STATUS}" | awk '{print $2}')
 
   if [[ -z $STATUS ]]; then
-    echo -e "${RD}Could not resolve host: ${domain}${NC}"
+    echo -e "${RD}Could not resolve host: ${DOMAIN}${NC}"
   elif [[ $CODE == 30* ]] || [[ $CODE == 200 ]]; then
     # curl for the http response code. If redirect is detected, check http response for redirected url
     # curl is using --insecure to ignore SSL issues (this tool isnt designed to troubleshoot that)
     # first awk adds a newline between results, tr fixes line ends (don't know why I had to)
     # second awk brings together each result
     # third awk adds color to each result: 301|302 Yellow and 200 Green
-    curl -sSIL --insecure "${domain}" | grep -i 'http/\|location' | grep -vi 'set-cookie:' | awk ' {print;} NR % 2 == 0 { print ""; }' | tr -d '\15\32' | sed '/HTTP.* 30[12]/s/$/ ----->/' | awk '!/^[Ll]ocation:/&&NR>1{print OFS}{printf "%s ",$0}END{print OFS}' | sed 's/[Ll]ocation: //g' | awk '/HTTP.* 30[12]/{s=3}/HTTP.* 200/{s=2}$0="\033[3"s"m"$0"\33[0m"'
+    curl -sSIL --insecure "${DOMAIN}" | grep -i 'http/\|location' | grep -vi 'set-cookie:' | awk ' {print;} NR % 2 == 0 { print ""; }' | tr -d '\15\32' | sed '/HTTP.* 30[12]/s/$/ ----->/' | awk '!/^[Ll]ocation:/&&NR>1{print OFS}{printf "%s ",$0}END{print OFS}' | sed 's/[Ll]ocation: //g' | awk '/HTTP.* 30[12]/{s=3}/HTTP.* 200/{s=2}$0="\033[3"s"m"$0"\33[0m"'
   else
     echo -e "${RD}$STATUS${NC}"
   fi
 }
 
-# Output
+# Help/Output
 if [[ -z ${1} ]]; then
-  echo -e "You have to enter a domain for me to search. Try dag [domain]\nStill need help? Try dag --help." 
+  echo -e "You have to enter a domain for me to search. Try 'dag [domain]'\nStill need help? Use 'dag --help'"
 elif [[ ${1} == "--help" ]]; then
   printf "
   Domain At a Glance, aka dag
-  To use, simply type: '"'dag [domain]'"' and dag will grab DNS, WhoIs, 
-  and HTTP status information. You can also specify a resolver: dag [domain] @[resolver]
+  To use simply type: '"'dag [domain]'"' and dag will grab DNS, WhoIs, and HTTP status information.
+  You can also specify a resolver: dag [domain] @[resolver]
 
   DNS Information:
-  dag will dig the domain you entered and give you the NS, A, MX, CNAME, and TXT records of the domain you entered.
-  For the A and MX records, dag will also tell you who owns the IP it's pointed to. Usually, this will show what company is hosting.
-  If the domain or subdomain you entered has a CNAME record, it will highlight CNAMEs in yellow.
-  CNAME will redirect DNS and this will make dag pull up DNS information of the domain the CNAME points to.
+  dag will dig the domain you entered and give you the NS, A, MX, CNAME, and TXT records of the
+  domain you entered. For the A and MX records, dag will also tell you who owns the IP it's pointed
+  to. Usually, this will show what company is hosting. If the domain or subdomain you entered has a
+  CNAME record, it will highlight CNAMEs in yellow. CNAME will redirect DNS and this will make dag 
+  pull up DNS information of the domain the CNAME points to.
   
   WhoIs Information:
-  Gets the registrar, reseller, important dates, and owner/admin name and email. WhoIs doesn't have a standardized format so
-  you may get incomplete info, especially for foreign and rare TLDs.
+  Gets the registrar, reseller, important dates, and owner/admin name and email. WhoIs doesn't have
+  a standardized format so you may get incomplete info, especially for foreign and rare TLDs.
 
   HTTP Status Information:
-  Curls the domain and looks for the http response code. If it detects a redirect, it will follow it until the end."
+  Curls the domain and looks for the http response code. If it detects a redirect, it will follow
+  it until the end."
   echo
 else
   dns_info
