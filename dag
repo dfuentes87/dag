@@ -23,6 +23,9 @@ NC='\033[0m'
 DOMAIN=$(echo -e "$1" | cut -d/ -f3)
 RESOLV="$2"
 
+# get whois before possible CNAME -> DOMAIN overwrite
+dom_whois=$(whois "${DOMAIN}")
+
 echo
 # DNS Information
 dns_info() {
@@ -42,7 +45,7 @@ dns_info() {
   if [[ "$CNAME" ]]; then
     echo -e "${RD}CNAME detected for${NC} ${DOMAIN}${YL}"
     printf "%-10s --> %-15s" "${DOMAIN}" "${CNAME}"
-    echo -e "${NC}\n${RD}This means the following DNS records will instead be for ${NC}${CNAME}"
+    echo -e "${NC}\n${RD}This means the following DNS records (but not WhoIs info) will instead be for ${NC}${CNAME}"
     DOMAIN=$CNAME
     echo
   fi
@@ -151,7 +154,7 @@ dns_info() {
     if [[ -z ${CAA} ]]; then
       echo -e "${RD}No CAA records found.${NC}"
     else
-      echo "${CAA}" | sed 1d
+      echo "${CAA}"
     fi
     echo
   }
@@ -174,8 +177,6 @@ who_info() {
 
   echo -e "This part of the script is not fully compatible with foreign and \nuncommon TLDs due to unstandardized WhoIs formats. If WhoIs data \nbelow is missing or poorly formatted, do a manual 'whois' lookup."
   echo
-
-  dom_whois=$(whois "${DOMAIN}")
 
   # check to avoid poor outputs
   reg_chk=$(echo "${dom_whois}" | grep -i 'Domain Name:' | head -1 | awk -F':' '{print $2}')
@@ -235,9 +236,7 @@ http_info() {
 
   # CNAME reminder
   if [[ "$CNAME" ]]; then
-    echo -e "${RD}CNAME detected for${NC} ${DOMAIN}${YL}"
-    printf "%-10s --> %-15s" "${DOMAIN}" "${CNAME}"
-    echo -e "${NC}\n${RD}cURL check will instead be on${NC} ${CNAME} "
+    echo -e "${RD}Due to the CNAME, curl will instead be for ${NC}${DOMAIN}${YL}"
     echo
     DOMAIN=$CNAME
   fi
